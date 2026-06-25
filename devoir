@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Examen Santé Publique</title>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+
+<style>
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    background: #e9eef5;
+    color: #1f2d3d;
+}
+
+.center {
+    min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+
+.box {
+    background: #fff;
+    padding: 25px;
+    width: 100%;
+    max-width: 600px;
+    border-radius: 12px;
+    box-shadow: 0 4px 15px rgba(0,0,0,.1);
+    text-align: center;
+}
+
+input, button {
+    width: 100%;
+    padding: 12px;
+    margin-top: 10px;
+    box-sizing: border-box;
+}
+
+button {
+    background: #2d7ff9;
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    cursor: pointer;
+    font-weight: bold;
+}
+
+.btn-pdf {
+    background: #e67e22;
+    margin-bottom: 10px;
+}
+
+#quiz {
+    display: none;
+    padding: 20px;
+}
+
+.top {
+    display: flex;
+    justify-content: space-between;
+    font-weight: bold;
+    margin-bottom: 10px;
+}
+
+.progress {
+    height: 8px;
+    background: #dfe6ee;
+    border-radius: 10px;
+    overflow: hidden;
+    margin-bottom: 15px;
+}
+
+.bar {
+    height: 100%;
+    width: 0%;
+    background: #2d7ff9;
+}
+
+.option {
+    display: block;
+    width: 100%;
+    margin: 8px 0;
+    padding: 12px;
+    background: #fff;
+    border: 1px solid #d0d7e2;
+    border-radius: 8px;
+    cursor: pointer;
+    text-align: left;
+    font-weight: bold;
+    color: #000;
+}
+
+.correct {
+    background: #2ecc71 !important;
+    color: #fff !important;
+}
+
+.wrong {
+    background: #e74c3c !important;
+    color: #fff !important;
+}
+
+/* Style de l'attestation masquée à l'écran, visible uniquement pour le PDF */
+#pdf-template {
+    display: none;
+    padding: 40px;
+    font-family: 'Times New Roman', serif;
+    color: #000;
+}
+</style>
+</head>
+<body>
+
+<div id="login" class="center">
+    <div class="box">
+        <h2>Examen Santé Publique</h2>
+        <input id="name" placeholder="Nom complet de l'étudiant">
+        <button onclick="start()">Commencer l'examen</button>
+    </div>
+</div>
+
+<div id="quiz">
+    <div class="top">
+        <div id="student"></div>
+        <div id="timer"></div>
+        <div id="score">0</div>
+    </div>
+    <div class="progress">
+        <div class="bar" id="bar"></div>
+    </div>
+    <h3 id="question"></h3>
+    <div id="options"></div>
+</div>
+
+<div id="pdf-template">
+    <div style="text-align: center; border: 4px double #000; padding: 30px;">
+        <h2>ATTESTATION DE REMISE DE NOTE</h2>
+        <p><i>Examen Officiel en Ligne - Santé Publique</i></p>
+        <hr style="width: 80%; border: 1px solid #000;">
+        <br><br>
+        <p style="text-align: left; font-size: 18px; line-height: 2;">
+            Je soussigné, le système automatisé d'évaluation, certifie que l'étudiant(e) :<br>
+            <strong>Nom / Prénom :</strong> <span id="pdf-user"></span><br>
+            <strong>Date de composition :</strong> <span id="pdf-date"></span><br>
+            <strong>Identifiant unique de session :</strong> <span id="pdf-id"></span>
+        </p>
+        <br>
+        <div style="background: #f2f2f2; padding: 20px; border: 1px solid #000; display: inline-block; min-width: 250px;">
+            <p style="font-size: 20px; margin: 0;"><strong>SCORE FINAL :</strong> <span id="pdf-score"></span> / 32</p>
+            <p style="font-size: 22px; margin: 10px 0 0 0; color: #111;"><strong>POURCENTAGE :</strong> <span id="pdf-percent"></span>%</p>
+        </div>
+        <br><br>
+        <p style="font-size: 20px;"><strong>Mention :</strong> <span id="pdf-mention"></span></p>
+        <br><br><br>
+        <p style="text-align: right; font-size: 14px;"><i>Document authentifié électroniquement - Ne pas modifier.</i></p>
+    </div>
+</div>
+
+<script>
+// =======================================================
+// VOTRE URL DE DÉPLOIEMENT GOOGLE SCRIPT CONFIGURÉE :
+// =======================================================
+const GOOGLE_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyPxgtqP5Y5vLP5j38C5b3-XybtuVQkUvrlrYV-EtomZ94f6yBt_Hf12RfslSKjz2z13w/exec";
+
+let qTime = 30;
+let answers = [];
+let questions = [
+    {q:`Question 1 : Quelle est la définition exacte de l'épidémiologie selon l'OMS (1968) ?`,o:[`A) La science qui étudie exclusivement le traitement médical individuel.`,`B) La science fondamentale de la santé publique qui étudie la distribution et les déterminants des états de santé pour les améliorer.`,`C) La science qui gère uniquement l'administration des hôpitaux.`],a:"B"},
+    {q:`Question 2 : Les déterminants de la santé incluent quels types de facteurs (OMS, 2010) ?`,o:[`A) Uniquement les facteurs génétiques.`,`B) Facteurs sociaux, économiques, culturels et environnementaux.`,`C) Uniquement la météo et le climat.`],a:"B"},
+    {q:`Question 3 : L'axe descriptif de l'épidémiologie observe et décrit la santé selon :`,o:[`A) Le temps, l'espace et la population.`,`B) Le budget de l'État.`,`C) Les molécules chimiques.`],a:"A"},
+    {q:`Question 4 : Quel auteur est associé dans le cours à la description de l'axe descriptif (2009) ?`,o:[`A) Albouty-Llaty.`,`B) Ouattara Djo Lamine.`,`C) L'OMS.`],a:"A"},
+    {q:`Question 5 : L'axe analytique de l'épidémiologie cherche à expliquer :`,o:[`A) Le prix des médicaments.`,`B) Le « Pourquoi ? » (les causes et les facteurs de risque des maladies).`,`C) L'impact final d'une campagne de vaccination.`],a:"B"},
+    {q:`Question 6 : L'axe évaluatif a pour rôle principal de :`,o:[`A) Mesurer l'efficacité et l'impact des interventions de santé publique.`,`B) Compter le nombre de médecins formés.`,`C) Décrire la répartition géographique d'un virus.`],a:"A"},
+    {q:`Question 7 : Quelles sont les 4 questions fondamentales de l'axe descriptif ?`,o:[`A) Pourquoi ? Comment ? Avec qui ? Dans quel but ?`,`B) Quand ? Où ? Qui ? Combien ?`,`C) Quel prix ? Quel traitement ? Quelle clinique ? Quelle guérison ?`],a:"B"},
+    {q:`Question 8 : Dans le cours, comment est classée la malnutrition ?`,o:[`A) Comme une maladie transmissible.`,`B) Comme une maladie non transmissible.`,`C) Comme une zoonose.`],a:"B"},
+    {q:`Question 9 : Dans le cours, comment est classée la rougeole ?`,o:[`A) Comme une maladie transmissible.`,`B) Comme une maladie non transmissible.`,`C) Comme une maladie environnementale.`],a:"A"},
+    {q:`Question 10 : L'approche clinique se distingue de l'approche épidémiologique car :`,o:[`A) La clinique soigne un groupe et l'épidémiologie soigne un individu.`,`B) La clinique soigne un individu (guérison) tandis que l'épidémiologie étudie un groupe (contrôle/éradication).`,`C) Les deux approches ont exactement les mêmes objectifs et cibles.`],a:"B"},
+    {q:`Question 11 : L'apparition soudaine et inattendue d'une maladie dans une population donnée s'appelle :`,o:[`A) Une endémie.`,`B) Une épidémie.`,`C) Une pandémie.`],a:"B"},
+    {q:`Question 12 : Une maladie qui sévit de manière permanente et continue dans une zone géographique précise est :`,o:[`A) Une endémie.`,`B) Une épidémie.`,`C) Une pandémie.`],a:"A"},
+    {q:`Question 13 : Une maladie qui touche simultanément la population de plusieurs continents ou du globe est :`,o:[`A) Une endémie.`,`B) Une épidémie.`,`C) Une pandémie.`],a:"C"},
+    {q:`Question 14 : Selon le tableau de référence du cours, une épidémie est caractérisée par :`,o:[`A) Temps Limité / Espace Limité.`,`B) Temps Illimité / Espace Limité.`,`C) Temps Limité / Espace Illimité.`],a:"A"},
+    {q:`Question 15 : Selon le tableau de référence, une endémie combine :`,o:[`A) Temps Limité / Espace Limité.`,`B) Temps Illimité / Espace Limité.`,`C) Temps Limité / Espace Illimité.`],a:"B"},
+    {q:`Question 16 : Selon le tableau de référence, une pandémie associe :`,o:[`A) Temps Illimité / Espace Limité.`,`B) Temps Limité / Espace Limité.`,`C) Temps Limité / Espace Illimité.`],a:"C"},
+    {q:`Question 17 : Quel est l'exemple de maladie donné dans le cours pour illustrer l'endémie ?`,o:[`A) La rougeole.`,`B) La lèpre.`,`C) Le VIH/SIDA.`],a:"B"},
+    {q:`Question 18 : Quel est l'exemple donné dans le cours pour illustrer la pandémie ?`,o:[`A) La rougeole.`,`B) La lèpre.`,`C) Le VIH/SIDA.`],a:"C"},
+    {q:`Question 19 : Quelle est la différence majeure entre une endémie et une pandémie concernant l'espace ?`,o:[`A) L'endémie traverse toutes les frontières (espace illimité).`,`B) L'endémie est géographiquement bloquée (espace limité) tandis que la pandémie traverse les frontières (espace illimité).`,`C) Il n'y a aucune différence d'espace entre les deux.`],a:"B"},
+    {q:`Question 20 : La surveillance épidémiologique est définie par l'OMS comme un processus :`,o:[`A) Continu et systématique.`,`B) Intermittent et facultatif.`,`C) Uniquement post-épidémique.`],a:"A"},
+    {q:`Question 21 : Quel type de surveillance repose sur la déclaration spontanée des cas par les soignants ?`,o:[`A) La surveillance active.`,`B) La surveillance passive.`,`C) La surveillance syndromique.`],a:"B"},
+    {q:`Question 22 : Quel type de surveillance consiste en une recherche proactive et volontaire des cas sur le terrain (enquêtes, dépistages) ?`,o:[`A) La surveillance passive.`,`B) La surveillance active.`,`C) La surveillance environnementale.`],a:"B"},
+    {q:`Question 23 : Quel est le biais majeur de la surveillance passive mis en avant dans le cours ?`,o:[`A) Elle tend à surestimer la fréquence réelle des maladies.`,`B) Elle tend à sous-estimer la fréquence réelle des maladies.`,`C) Elle bloque la prise de décision politique.`],a:"B"},
+    {q:`Question 24 : La surveillance sentinelle se caractérise par :`,o:[`A) Un recueil par un réseau sélectionné de professionnels sur des populations cibles (moindre coût).`,`B) Une obligation légale de dépister toute la population nationale.`,`C) Une analyse des facteurs extérieurs comme l'eau et l'air.`],a:"A"},
+    {q:`Question 25 : La surveillance syndromique a la particularité de surveiller les symptômes :`,o:[`A) Uniquement après confirmation du laboratoire.`,`B) Avant même d'obtenir un diagnostic biologique définitif.`,`C) Uniquement chez les animaux domestiques.`],a:"B"},
+    {q:`Question 26 : Que surveille-t-on en priorité lors d'une surveillance environnementale ?`,o:[`A) Les facteurs extérieurs (eau, air, sol) impactant la santé.`,`B) Les syndromes cliniques des patients hospitalisés.`,`C) Les réseaux sélectionnés de professionnels de santé.`],a:"A"},
+    {q:`Question 27 : Les différents types de surveillance (passive, active, etc.) sont-ils mutuellement exclusifs ?`,o:[`A) Oui, on ne peut utiliser qu'un seul type à la fois.`,`B) Non, ils ne sont pas mutuellement exclusifs ; ils s'associent.`],a:"B"},
+    {q:`Question 28 : Quels sont les 4 objectifs de la surveillance épidémiologique ?`,o:[`A) Dépister, soigner, guérir, facturer.`,`B) Détection précoce, suivi des tendances, évaluation des interventions, planification politique.`,`C) Identifier l'étudiant, appeler le numéro, modifier sur WPS, imprimer.`],a:"B"},
+    {q:`Question 29 : Quelle est la différence entre surveillance syndromique et diagnostic ?`,o:[`A) Le diagnostic détecte l'anomalie de groupe avant la surveillance.`,`B) La surveillance syndromique détecte l'anomalie de groupe avant que le médecin n'ait posé un diagnostic de certitude.`,`C) C'est la même chose.`],a:"B"},
+    {q:`Question 30 : Que signifie l'acronyme « MDO » en santé publique ?`,o:[`A) Maladies à Déclaration Obligatoire.`,`B) Mécanismes de Défense Organisée.`,`C) Malnutrition Directe Observée.`],a:"A"},
+    {q:`Question 31 : Qu'est-ce que l'approche interdisciplinaire « One Health » (Une seule santé) ?`,o:[`A) Une approche qui oblige à utiliser un seul médicament par patient.`,`B) Une alliance indissociable entre santé humaine et santé animale pour contrer les menaces globales.`,`C) Un système informatique de gestion des hôpitaux.`],a:"B"},
+    {q:`Question 32 : Comment définit-on une « Zoonose » ?`,o:[`A) Une maladie génétique héréditaire.`,`B) Une maladie infectieuse transmissible de l'animal à l'homme.`,`C) Une maladie liée à l'excitation.`],a:"B"}
+];
+
+// Mélange des questions au démarrage
+questions = questions.sort(() => Math.random() - 0.5);
+
+let i = 0;
+let score = 0;
+let user = "";
+let lock = false;
+let interval;
+let current = 0;
+let finalNote = 0;
+let finalAppellation = "";
+
+function start() {
+    user = document.getElementById("name").value.trim();
+    if (!user) {
+        alert("Nom requis");
+        return;
+    }
+
+    let state = localStorage.getItem("status_" + user);
+    if (state === "termine" || state === "en_cours") {
+        alert("Action non autorisée : Tentative de double composition ou fraude détectée.");
+        forceFailure();
+        return;
+    }
+
+    // Sécurisation immédiate : Marquer l'étudiant comme actif
+    localStorage.setItem("status_" + user, "en_cours");
+
+    document.getElementById("login").style.display = "none";
+    document.getElementById("quiz").style.display = "block";
+    document.getElementById("student").innerText = user;
+    load();
+}
+
+function forceFailure() {
+    localStorage.setItem("status_" + user, "termine");
+    score = 0;
+    sendDataToGoogle(0, 0, "Fraude / Tentative de double test");
+    finish();
+}
+
+function timer() {
+    clearInterval(interval);
+    current = qTime;
+    document.getElementById("timer").innerText = `⏱ ${current}s`;
+    interval = setInterval(() => {
+        current--;
+        document.getElementById("timer").innerText = `⏱ ${current}s`;
+        if (current <= 0) {
+            clearInterval(interval);
+            autoNext();
+        }
+    }, 1000);
+}
+
+function load() {
+    lock = false;
+    let q = questions[i];
+    document.getElementById("question").innerText = q.q;
+    let box = document.getElementById("options");
+    box.innerHTML = "";
+
+    q.o.forEach(opt => {
+        let b = document.createElement("button");
+        b.className = "option";
+        b.innerText = opt;
+        b.onclick = () => answer(opt.charAt(0));
+        box.appendChild(b);
+    });
+
+    document.getElementById("bar").style.width = ((i / questions.length) * 100) + "%";
+    timer();
+}
+
+function answer(val) {
+    if (lock) return;
+    lock = true;
+
+    let correct = questions[i].a;
+    
+    answers.push({
+        indexQ: i,
+        question: questions[i].q,
+        correct: correct,
+        selected: val
+    });
+
+    let buttons = document.querySelectorAll(".option");
+    buttons.forEach(btn => {
+        btn.disabled = true;
+        let letter = btn.innerText.charAt(0);
+        if (letter === correct) {
+            btn.classList.add("correct");
+        }
+        if (letter === val && val !== correct) {
+            btn.classList.add("wrong");
+        }
+    });
+
+    if (val === correct) {
+        score++;
+    }
+    document.getElementById("score").innerText = score;
+
+    clearInterval(interval);
+    setTimeout(() => {
+        i++;
+        if (i >= questions.length) {
+            finish();
+        } else {
+            load();
+        }
+    }, 1000);
+}
+
+function autoNext() {
+    lock = true;
+    let correctLetter = questions[i].a;
+
+    answers.push({
+        indexQ: i,
+        question: questions[i].q,
+        correct: correctLetter,
+        selected: "Aucune"
+    });
+
+    let buttons = document.querySelectorAll(".option");
+    buttons.forEach(btn => {
+        btn.disabled = true;
+        if (btn.innerText.charAt(0) === correctLetter) {
+            btn.classList.add("correct");
+        }
+    });
+
+    setTimeout(() => {
+        i++;
+        if (i >= questions.length) {
+            finish();
+        } else {
+            load();
+        }
+    }, 1200);
+}
+
+function finish() {
+    clearInterval(interval);
+    localStorage.setItem("status_" + user, "termine");
+
+    finalNote = (score / questions.length) * 100;
+    finalAppellation =
+        finalNote < 30 ? "Très insuffisant" :
+        finalNote < 50 ? "Insuffisant" :
+        finalNote < 65 ? "Passable" :
+        finalNote < 75 ? "Assez bien" :
+        finalNote < 85 ? "Bien" :
+        finalNote < 95 ? "Très bien" : "Excellent";
+
+    // Expédition automatique de la note finale vers Google Sheets
+    sendDataToGoogle(score, finalNote.toFixed(1), finalAppellation);
+
+    document.body.innerHTML = `
+    <div class="center">
+        <div class="box">
+            <h2>Résultat final</h2>
+            <p style="color: #2ecc71; font-size: 14px;"><b>✓ Synchronisation :</b> Votre note a été sauvegardée sur le serveur de l'enseignant.</p>
+            <p><b>Étudiant :</b> ${user}</p>
+            <p><b>Score :</b> ${score}/${questions.length}</p>
+            <p><b>Pourcentage :</b> ${finalNote.toFixed(1)}%</p>
+            <h3>Avis : ${finalAppellation}</h3>
+            <button onclick="downloadPDF()" class="btn-pdf">Télécharger l'attestation officielle (PDF)</button>
+            <button onclick="showCorrection()">Voir la correction détaillée</button>
+        </div>
+    </div>`;
+}
+
+// Module d'expédition vers Google Sheets
+function sendDataToGoogle(finalScore, percent, mention) {
+    if(!GOOGLE_SCRIPT_URL || GOOGLE_SCRIPT_URL.startsWith("REMPLACEZ")) return;
+
+    let payload = {
+        nom: user,
+        score: finalScore + "/" + questions.length,
+        pourcentage: percent + "%",
+        mention: mention
+    };
+
+    fetch(GOOGLE_SCRIPT_URL, {
+        method: "POST",
+        mode: "no-cors", 
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload)
+    }).catch(err => console.error("Erreur de synchronisation Google Sheets : ", err));
+}
+
+function downloadPDF() {
+    document.getElementById("pdf-user").innerText = user;
+    document.getElementById("pdf-date").innerText = new Date().toLocaleString('fr-FR');
+    document.getElementById("pdf-id").innerText = "SP-" + Math.floor(100000 + Math.random() * 900000);
+    document.getElementById("pdf-score").innerText = score;
+    document.getElementById("pdf-percent").innerText = finalNote.toFixed(1);
+    document.getElementById("pdf-mention").innerText = finalAppellation;
+
+    const element = document.getElementById("pdf-template");
+    element.style.display = "block";
+
+    const options = {
+        margin: 15,
+        filename: 'Attestation_Note_' + user.replace(/\s+/g, '_') + '.pdf',
+        image: { type: 'jpeg', quality: 0.98 },
+        html2canvas: { scale: 2 },
+        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+    };
+
+    html2pdf().set(options).from(element).save().then(() => {
+        element.style.display = "none";
+    });
+}
+
+function showCorrection() {
+    let html = `
+    <div style="padding:20px; max-width:700px; margin:0 auto; font-family:Arial, sans-serif;">
+        <h2>Correction détaillée</h2>
+    `;
+
+    answers.forEach((a, index) => {
+        let isCorrect = (a.selected === a.correct);
+        let color = isCorrect ? "#d4edda" : "#f8d7da";
+        let border = isCorrect ? "1px solid #c3e6cb" : "1px solid #f5c6cb";
+
+        let originalOptions = questions[a.indexQ].o;
+        let fullCorrectText = originalOptions.find(opt => opt.startsWith(a.correct + ")"));
+
+        let fullSelectedText = "Aucune réponse (Temps écoulé)";
+        if (a.selected !== "Aucune") {
+            fullSelectedText = originalOptions.find(opt => opt.startsWith(a.selected + ")"));
+        }
+
+        html += `
+        <div style="background:${color}; border:${border}; padding:15px; margin-bottom:15px; border-radius:10px; color:#1f2d3d;">
+            <b>Question ${index + 1}</b><br><br>
+            <b>Énoncé :</b><br>
+            ${a.question}<br><br>
+            <b style="color: #1e7e34;">Bonne réponse attendue :</b><br> ${fullCorrectText}<br><br>
+            <b style="color: ${isCorrect ? '#1e7e34' : '#bd2130'};">Votre réponse :</b><br> ${fullSelectedText}
+        </div>`;
+    });
+
+    html += `<br><button onclick="window.location.reload()" style="max-width:200px;">Retour à l'accueil</button></div>`;
+    document.body.innerH
